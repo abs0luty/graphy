@@ -400,15 +400,43 @@ class Graph:
             current_vertex = previous[current_vertex]
 
         return path[::-1]
+    
+    def _is_cyclic_util(self,
+                        vertex: int,
+                        visited: list[bool],
+                        parent: int) -> bool:
+        """
+        Single recursive iteration of DFS algorithm.
+        """
+        visited[vertex] = True
+        for child in self.children_of(vertex):
+            if not visited[child.vertex]:
+                if self._is_cyclic_util(child.vertex, visited, vertex):
+                    return True
+            elif parent != child.vertex:
+                return True
+        
+        return False
+    
+    def is_cyclic(self) -> bool:
+        """
+        Returns whether the graph is cyclic or not.
+        """
+        visited = [False] * self._vertices_count
+
+        for vertex in range(self._vertices_count):
+            if not visited[vertex]:
+                if self._is_cyclic_util(vertex, visited, -1):
+                    return True
+                
+        return False
 
 graph = Graph(6)
 graph.add_bidirectional_edges([
     Edge(1, 2),
-    Edge(1, 3),
-    Edge(3, 4),
-    Edge(4, 5),
-    Edge(2, 5)
+    Edge(2, 3),
 ])
 
 print(graph.dijkstra(1, infinite_distance=int(1e11)))
 print(graph.shortest_path_between(1, 5))
+print(graph.is_cyclic())
