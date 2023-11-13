@@ -1,6 +1,7 @@
 from collections.abc import Callable, Iterable
 from typing import Optional
 from enum import Enum, auto
+from queue import PriorityQueue
 
 
 class TraverseAlgorithm(Enum):
@@ -354,6 +355,51 @@ class Graph:
                         distances[child.vertex] = new_distance
 
         return distances
+    
+    def distance_between(self, source: int, destination: int) -> int:
+        """
+        Returns the distance between two vertices in the graph.
+        """
+        return self.dijkstra(source)[destination]
+    
+    def shortest_path_between(self, 
+                              source: int, 
+                              destination: int,
+                              infinite_distance: int = int(1e9)) -> list[int]:
+        """
+        Returns the shortest path between two vertices in the graph.
+        """
+        queue = PriorityQueue()
+        queue.put((0, source))
+
+        distances = [infinite_distance] * self._vertices_count
+        distances[source] = 0
+        previous = [None] * self._vertices_count
+
+        while not queue.empty():
+            current_distance, current_vertex = queue.get()
+
+            if current_vertex == destination:
+                break
+
+            if current_distance > distances[current_vertex]:
+                continue
+
+            for child in self.children_of(current_vertex):
+                new_distance = current_distance + child.edge_weight
+
+                if new_distance < distances[child.vertex]:
+                    distances[child.vertex] = new_distance
+                    previous[child.vertex] = current_vertex
+                    queue.put((new_distance, child.vertex))
+
+        path = []
+        current_vertex = destination
+        while current_vertex is not None:
+            path.append(current_vertex)
+            current_vertex = previous[current_vertex]
+
+        return path[::-1]
 
 graph = Graph(6)
 graph.add_bidirectional_edges([
@@ -365,3 +411,4 @@ graph.add_bidirectional_edges([
 ])
 
 print(graph.dijkstra(1, infinite_distance=int(1e11)))
+print(graph.shortest_path_between(1, 5))
