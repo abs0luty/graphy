@@ -333,17 +333,23 @@ class Graph:
                 minimum_distance_vertex = vertex
 
         return minimum_distance_vertex
+    
+    def dijkstra(self, source: int) -> list[int]:
+        """
+        Returns shortest distances from given source to all vertices in the graph.
+        """
+        distances = [1e7] * self._vertices_count
+        distances[source] = 0
+        visited = [False] * self._vertices_count
 
-graph = Graph(8)
-graph.add_edges([
-    Edge(1, 0),
-    Edge(0, 3),
-    Edge(3, 2),
-    Edge(2, 1),
-    Edge(4, 2),
-    Edge(5, 4),
-    Edge(6, 5),
-    Edge(4, 6),
-    Edge(7, 6)
-])
-print(graph.connected_components_count())
+        for _ in range(self._vertices_count):
+            u = self._minimum_distance_vertex(distances, visited)
+            visited[u] = True
+
+            for child in self.children_of(u):
+                if not visited[child.vertex]:
+                    new_distance = distances[u] + child.edge_weight
+                    if new_distance < distances[child.vertex]:
+                        distances[child.vertex] = new_distance
+
+        return distances
