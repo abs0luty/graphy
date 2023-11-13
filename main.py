@@ -278,7 +278,8 @@ class Graph:
         elif algorithm == TraverseAlgorithm.DFS:
             self._dfs_through_edges(starting_vertex, visited, visit)
 
-    def connected_components_count(self, traverse_algorithm: TraverseAlgorithm) -> int:
+    def connected_components_count(self, 
+                                   traverse_algorithm: TraverseAlgorithm = TraverseAlgorithm.BFS) -> int:
         """
         Returns the number of connected components in the graph.
         """
@@ -314,6 +315,7 @@ class Graph:
         
         return components
 
+            
     def _minimum_distance_vertex(self, 
                                  distances: list[int], 
                                  visited: list[int]) -> int:
@@ -332,12 +334,16 @@ class Graph:
 
         return minimum_distance_vertex
 
-graph = Graph.from_adjacency_matrix([[0, 1], [1, 0]])
-
-graph.add_edges([Edge(0, 1), Edge(1, 0)])
-graph.add_bidirectional_edge(Edge(0, 1))
-
-graph.traverse(0, visit=lambda x: print(x))
-graph.traverse_through_edges(0, 
-                             TraverseAlgorithm.BFS, 
-                             visit=lambda e: print(e))
+graph = Graph(8)
+graph.add_edges([
+    Edge(1, 0),
+    Edge(0, 3),
+    Edge(3, 2),
+    Edge(2, 1),
+    Edge(4, 2),
+    Edge(5, 4),
+    Edge(6, 5),
+    Edge(4, 6),
+    Edge(7, 6)
+])
+print(graph.connected_components_count())
