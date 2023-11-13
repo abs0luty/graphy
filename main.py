@@ -46,6 +46,19 @@ class Graph:
         for _ in range(vertices_count):
             self.children.append([])
 
+    def from_adjacency_matrix(self, matrix: list[list[int]]):
+        """
+        Constructors a graph frmo its adjacency matrix with weights
+        """
+        assert len(matrix) == self.vertices_count
+
+        for i in range(len(matrix)):
+            for j in range(len(matrix)):
+                weight = matrix[i][j]
+
+                if weight != 0:
+                    self.add_edge(i, j, weight)
+
     def add_bidirectional_edge(self, edge: Edge):
         """
         Adds an edge between two given vertices in both directions.
@@ -231,13 +244,10 @@ class Graph:
 
         return minimum_distance_vertex
 
-graph = Graph(5)
-graph.add_bidirectional_edge(Edge(1, 2, 3))
-graph.add_edge(Edge(2, 4, 8))
-graph.add_edge(Edge(2, 3))
+graph = Graph(7)
+graph.add_bidirectional_edge(Edge(0, 1, 4))
+graph.add_edge(Edge(1, 2, 3))
+graph.add_edge(Edge(2, 3, 4))
+graph.add_bidirectional_edge(Edge(3, 4))
 
-graph.dfs(1, visit = lambda x: print(x))
-graph.dfs_through_edges(1, visit = lambda x: print(x))
-
-graph.bfs(1, visit = lambda x: print(x))
-graph.bfs_through_edges(1, visit = lambda x: print(x))
+graph.dfs_through_edges(0, visit = lambda x: print(x))
