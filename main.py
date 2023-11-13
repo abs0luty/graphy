@@ -42,12 +42,10 @@ class Child:
 class Graph:
     _children: list[list[Child]]
     _vertices_count: int
-    _dijkstra_infinite_distance: int
 
-    def __init__(self, vertices_count: int, dijkstra_infinite_distance: int = int(1e7)):
+    def __init__(self, vertices_count: int):
         self._children = []
         self._vertices_count = vertices_count
-        self._dijkstra_infinite_distance = dijkstra_infinite_distance
 
         for _ in range(vertices_count):
             self._children.append([])
@@ -317,6 +315,7 @@ class Graph:
 
             
     def _minimum_distance_vertex(self, 
+                                 infinite_distance: int,
                                  distances: list[int], 
                                  visited: list[int]) -> int:
         """
@@ -324,7 +323,7 @@ class Graph:
         minimum distance value, from the set of vertices
         not yet included in shortest path tree.
         """
-        minimum_distance = 1e7
+        minimum_distance = infinite_distance
         minimum_distance_vertex = -1
 
         for vertex in range(self._vertices_count):
@@ -334,16 +333,18 @@ class Graph:
 
         return minimum_distance_vertex
     
-    def dijkstra(self, source: int) -> list[int]:
+    def dijkstra(self, 
+                 source: int,
+                 infinite_distance: int = int(1e9)) -> list[int]:
         """
         Returns shortest distances from given source to all vertices in the graph.
         """
-        distances = [1e7] * self._vertices_count
+        distances = [infinite_distance] * self._vertices_count
         distances[source] = 0
         visited = [False] * self._vertices_count
 
         for _ in range(self._vertices_count):
-            u = self._minimum_distance_vertex(distances, visited)
+            u = self._minimum_distance_vertex(infinite_distance, distances, visited)
             visited[u] = True
 
             for child in self.children_of(u):
@@ -353,3 +354,14 @@ class Graph:
                         distances[child.vertex] = new_distance
 
         return distances
+
+graph = Graph(6)
+graph.add_bidirectional_edges([
+    Edge(1, 2),
+    Edge(1, 3),
+    Edge(3, 4),
+    Edge(4, 5),
+    Edge(2, 5)
+])
+
+print(graph.dijkstra(1, infinite_distance=int(1e11)))
