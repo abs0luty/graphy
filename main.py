@@ -1,5 +1,11 @@
-from collections.abc import Callable, Iterator
-from typing import Optional, Self
+from collections.abc import Callable, Iterable
+from typing import Optional
+from enum import Enum, auto
+
+
+class TraverseAlgorithm(Enum):
+    DFS = auto()
+    BFS = auto()
 
 
 class Edge:
@@ -14,10 +20,10 @@ class Edge:
         self.destination = destination
         self.weight = weight
 
-    def __str__(self) -> str:
-        return "Edge(%d, %d, %d)" % (self.source, self.destination, self.weight)
+    def __repr__(self) -> str:
+        return "Edge(source=%d, dest=%d, weight=%d)" % (self.source, self.destination, self.weight)
 
-    def inverted(self) -> Self:
+    def inverted(self) -> 'Edge':
         return Edge(self.destination, self.source, self.weight)
 
 
@@ -29,35 +35,38 @@ class Child:
         self.vertex = vertex
         self.edge_weight = edge_weight
     
-    def __str__(self) -> str:
-        return "Child(%d, %d)" % (self.vertex, self.edge_weight)
+    def __repr__(self) -> str:
+        return "Child(vertex=%d, edge_weight=%d)" % (self.vertex, self.edge_weight)
 
 
 class Graph:
-    children: list[list[Child]]
-    vertices_count: int
-    dijkstra_infinite_distance: int
+    _children: list[list[Child]]
+    _vertices_count: int
+    _dijkstra_infinite_distance: int
 
-    def __init__(self, vertices_count: int, dijkstra_infinite_distance: int = 1e7):
-        self.children = []
-        self.vertices_count = vertices_count
-        self.dijkstra_infinite_distance = dijkstra_infinite_distance
+    def __init__(self, vertices_count: int, dijkstra_infinite_distance: int = int(1e7)):
+        self._children = []
+        self._vertices_count = vertices_count
+        self._dijkstra_infinite_distance = dijkstra_infinite_distance
 
         for _ in range(vertices_count):
-            self.children.append([])
+            self._children.append([])
 
-    def from_adjacency_matrix(self, matrix: list[list[int]]):
+    @staticmethod
+    def from_adjacency_matrix(matrix: list[list[int]]) -> 'Graph':
         """
         Constructors a graph frmo its adjacency matrix with weights
         """
-        assert len(matrix) == self.vertices_count
+        graph = Graph(len(matrix))
 
         for i in range(len(matrix)):
             for j in range(len(matrix)):
                 weight = matrix[i][j]
 
                 if weight != 0:
-                    self.add_edge(i, j, weight)
+                    graph.add_edge(Edge(i, j, weight))
+
+        return graph
 
     def add_bidirectional_edge(self, edge: Edge):
         """
@@ -70,12 +79,28 @@ class Graph:
         """
         Adds an edge between two given vertices.
         """
-        assert edge.source < self.vertices_count, "Invalid vertex index"
-        assert edge.destination < self.vertices_count, "Invalid vertex index"
+        assert edge.source < self._vertices_count, "Invalid vertex index"
+        assert edge.destination < self._vertices_count, "Invalid vertex index"
 
-        self.children[edge.source].append(Child(edge.destination, edge.weight))
+        child = Child(edge.destination, edge.weight)
+        if child not in self._children[edge.source]:
+            self._children[edge.source].append(child)
+
+    def add_edges(self, edges: Iterable[Edge]):
+        """
+        Adds multiple edges to the graph.
+        """
+        for edge in edges:
+            self.add_edge(edge)
+
+    def add_bidirectional_edges(self, edges: Iterable[Edge]):
+        """
+        Adds multiple bidirectional edges to the graph.
+        """
+        for edge in edges:
+            self.add_bidirectional_edge(edge)
     
-    def children_of(self, vertex: int) -> Iterator[Child]:
+    def children_of(self, vertex: int) -> Iterable[Child]:
         """
         Returns all children of the given vertex.
 
@@ -88,13 +113,41 @@ class Graph:
             assert graph.children_of(0)[0].vertex == 2
             assert graph.children_of(1)[0].vertex == 2
         """
-        assert vertex < self.vertices_count, "Invalid vertex index"
+        assert vertex < self._vertices_count, "Invalid vertex index"
 
-        return self.children[vertex]
+        return self._children[vertex]
     
-    def _dfs_through_edges(self, starting_vertex: int, 
-            visited: list[int], 
-            visit: Callable[[Edge], None]):
+    def is_undirected(self) -> bool:
+        """
+        Returns True if the graph is directed, False otherwise.
+        """
+        is_undirected = True
+
+
+        for source in range(self._vertices_count):
+            for child in self._children[source]:
+                if not(child in self._children[source] and 
+                   source in self._children[child.vertex]):
+                    is_undirected = False
+
+        return is_undirected
+
+    def to_undirected(self) -> 'Graph':
+        """
+        Converts the graph to an undirected graph.
+        """
+        undirected = Graph(self._vertices_count)
+
+        for source in range(self._vertices_count):
+            for child in self._children[source]:
+                undirected.add_bidirectional_edge(Edge(source, child.vertex, child.edge_weight))
+        
+        return undirected
+    
+    def _dfs_through_edges_rec(self, 
+                               starting_vertex: int, 
+                               visited: list[bool],
+                               visit: Callable[[Edge], None]):
         """
         Single recursive iteration of DFS algorithm.
         """
@@ -102,34 +155,27 @@ class Graph:
             if not visited[child.vertex]:
                 visited[child.vertex] = True
                 visit(Edge(starting_vertex, child.vertex, child.edge_weight))
-                self._dfs_through_edges(child.vertex, visited, visit)
+                self._dfs_through_edges_rec(child.vertex, visited, visit)
 
-    def dfs_through_edges(self, starting_vertex: int, 
-            visited: Optional[list[int]] = None,
-            visit: Callable[[Edge], None] = lambda _: None):
+    def _dfs_through_edges(self, 
+                           starting_vertex: int, 
+                           visited: Optional[list[bool]] = None,
+                           visit: Callable[[Edge], None] = lambda _: None):
         """
         Traverse the graph using DFS algorithm.
-
-        .. highlight:: python
-        .. code-block:: python
-            graph = Graph(3)
-            graph.add_edge(Edge(0, 2))
-            graph.add_edge(Edge(1, 2, 2))
-
-            graph.dfs_through_edges(0, visit = lambda edge: print(edge.source))
-            graph.dfs_through_edges(0, visit = lambda edge: print(edge.weight))
         """
-        if visited == None:
-            visited = [False] * self.vertices_count
+        if visited is None:
+            visited = [False] * self._vertices_count
 
-        assert len(visited) == self.vertices_count
+        assert len(visited) == self._vertices_count
 
         visited[starting_vertex] = True
-        self._dfs_through_edges(starting_vertex, visited, visit)
+        self._dfs_through_edges_rec(starting_vertex, visited, visit)
     
-    def _dfs(self, starting_vertex: int, 
-            visited: list[int], 
-            visit: Callable[[Edge], None]):
+    def _dfs_rec(self, 
+                 starting_vertex: int, 
+                 visited: list[bool],
+                 visit: Callable[[int], None]):
         """
         Single recursive iteration of DFS algorithm.
         """
@@ -137,52 +183,37 @@ class Graph:
             if not visited[child.vertex]:
                 visit(child.vertex)
                 visited[child.vertex] = True
-                self._dfs(child.vertex, visited, visit)
+                self._dfs_rec(child.vertex, visited, visit)
 
-    def dfs(self, starting_vertex: int, 
-            visited: Optional[list[int]] = None,
-            visit: Callable[[int], None] = lambda _: None):
+    def _dfs(self, 
+             starting_vertex: int, 
+             visited: Optional[list[bool]] = None,
+             visit: Callable[[int], None] = lambda _: None):
         """
         Traverse the graph using DFS algorithm.
-
-        .. highlight:: python
-        .. code-block:: python
-            graph = Graph(3)
-            graph.add_edge(Edge(0, 2))
-            graph.add_edge(Edge(1, 2, 2))
-
-            graph.dfs(0, visit = lambda x: print(x))
         """
-        if visited == None:
-            visited = [False] * self.vertices_count
+        if visited is None:
+            visited = [False] * self._vertices_count
 
-        assert len(visited) == self.vertices_count
+        assert len(visited) == self._vertices_count
 
         if not visited[starting_vertex]:
             visit(starting_vertex)
 
         visited[starting_vertex] = True
-        self._dfs(starting_vertex, visited, visit)
+        self._dfs_rec(starting_vertex, visited, visit)
 
-    def bfs_through_edges(self, starting_vertex: int,
-            visited: Optional[list[int]] = None,
-            visit: Callable[[Edge], None] = lambda _: None):
+    def _bfs_through_edges(self, 
+                           starting_vertex: int,
+                           visited: Optional[list[bool]] = None,
+                           visit: Callable[[Edge], None] = lambda _: None):
         """
-        Traverse the graph using DFS algorithm.
-
-        .. highlight:: python
-        .. code-block:: python
-            graph = Graph(3)
-            graph.add_edge(Edge(0, 2))
-            graph.add_edge(Edge(1, 2, 2))
-
-            graph.bfs_through_edges(0, visit = lambda edge: print(edge.source))
-            graph.bfs_through_edges(0, visit = lambda edge: print(edge.weight))
+        Traverse the graph using BFS algorithm.
         """
-        if visited == None:
-            visited = [False] * self.vertices_count
+        if visited is None:
+            visited = [False] * self._vertices_count
 
-        assert len(visited) == self.vertices_count
+        assert len(visited) == self._vertices_count
 
         visited[starting_vertex] = True
         queue = [starting_vertex]
@@ -195,24 +226,17 @@ class Graph:
                     visit(Edge(node, child.vertex, child.edge_weight))
                     visited[child.vertex] = True
 
-    def bfs(self, starting_vertex: int,
-            visited: Optional[list[int]] = None,
-            visit: Callable[[int], None] = lambda _: None):
+    def _bfs(self, 
+             starting_vertex: int,
+             visited: Optional[list[bool]] = None,
+             visit: Callable[[int], None] = lambda _: None):
         """
-        Traverse the graph using DFS algorithm.
-
-        .. highlight:: python
-        .. code-block:: python
-            graph = Graph(3)
-            graph.add_edge(Edge(0, 2))
-            graph.add_edge(Edge(1, 2, 2))
-
-            graph.bfs(0, visit = lambda x: print(x))
+        Traverse the graph using BFS algorithm.
         """
-        if visited == None:
-            visited = [False] * self.vertices_count
+        if visited is None:
+            visited = [False] * self._vertices_count
 
-        assert len(visited) == self.vertices_count
+        assert len(visited) == self._vertices_count
 
         if not visited[starting_vertex]:
             visit(starting_vertex)
@@ -228,7 +252,71 @@ class Graph:
                     visit(child.vertex)
                     visited[child.vertex] = True
 
-    def _minimum_distance_vertex(self, distances: list[int], visited: list[int]) -> int:
+    def traverse(self,
+                 starting_vertex: int,
+                 algorithm: TraverseAlgorithm = TraverseAlgorithm.BFS,
+                 visited: Optional[list[bool]] = None,
+                 visit: Callable[[int], None] = lambda _: None):
+        """
+        Traverses the graph using the given algorithm.
+        """
+        if algorithm == TraverseAlgorithm.BFS:
+            self._bfs(starting_vertex, visited, visit)
+        elif algorithm == TraverseAlgorithm.DFS:
+            self._dfs(starting_vertex, visited, visit)
+
+    def traverse_through_edges(self, 
+                               starting_vertex: int,
+                               algorithm: TraverseAlgorithm,
+                               visited: Optional[list[bool]] = None,
+                               visit: Callable[[Edge], None] = lambda _: None):
+        """
+        Traverses the graph using the given algorithm.
+        """
+        if algorithm == TraverseAlgorithm.BFS:
+            self._bfs_through_edges(starting_vertex, visited, visit)
+        elif algorithm == TraverseAlgorithm.DFS:
+            self._dfs_through_edges(starting_vertex, visited, visit)
+
+    def connected_components_count(self, traverse_algorithm: TraverseAlgorithm) -> int:
+        """
+        Returns the number of connected components in the graph.
+        """
+        visited = [False] * self._vertices_count
+        count = 0
+
+        for vertex in range(self._vertices_count):
+            if not visited[vertex]:
+                count += 1
+                self.traverse(vertex, 
+                              traverse_algorithm, 
+                              visited, 
+                              lambda x: None)
+
+        return count
+    
+    def connected_components(self, 
+                             traverse_algorithm: TraverseAlgorithm = TraverseAlgorithm.BFS) -> list[list[int]]:
+        """
+        Returns the connected components of the graph.
+        """
+        visited = [False] * self._vertices_count
+        components = []
+
+        for vertex in range(self._vertices_count):
+            if not visited[vertex]:
+                component = []
+                self.traverse(vertex, 
+                              traverse_algorithm, 
+                              visited, 
+                              lambda x: component.append(x))
+                components.append(component)
+        
+        return components
+
+    def _minimum_distance_vertex(self, 
+                                 distances: list[int], 
+                                 visited: list[int]) -> int:
         """
         A utility function to find the vertex with
         minimum distance value, from the set of vertices
@@ -237,17 +325,19 @@ class Graph:
         minimum_distance = 1e7
         minimum_distance_vertex = -1
 
-        for vertex in range(self.vertices_count):
+        for vertex in range(self._vertices_count):
             if distances[vertex] < minimum_distance and not visited[vertex]:
                 minimum_distance = distances[vertex]
                 minimum_distance_vertex = vertex
 
         return minimum_distance_vertex
 
-graph = Graph(7)
-graph.add_bidirectional_edge(Edge(0, 1, 4))
-graph.add_edge(Edge(1, 2, 3))
-graph.add_edge(Edge(2, 3, 4))
-graph.add_bidirectional_edge(Edge(3, 4))
+graph = Graph.from_adjacency_matrix([[0, 1], [1, 0]])
 
-graph.dfs_through_edges(0, visit = lambda x: print(x))
+graph.add_edges([Edge(0, 1), Edge(1, 0)])
+graph.add_bidirectional_edge(Edge(0, 1))
+
+graph.traverse(0, visit=lambda x: print(x))
+graph.traverse_through_edges(0, 
+                             TraverseAlgorithm.BFS, 
+                             visit=lambda e: print(e))
